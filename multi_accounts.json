@@ -1,0 +1,46 @@
+{
+  "endpoints": [
+    {
+      "ClientType": "geth",
+      "RPC": "http://localhost:32773",
+      "WebSocket": "ws://localhost:8546",
+      "ServiceName": "geth-node",
+      "LogsDir": ""
+    },
+    {
+      "ClientType": "nethermind",
+      "RPC": "http://localhost:32783",
+      "WebSocket": "ws://localhost:8546",
+      "ServiceName": "nethermind-node",
+      "LogsDir": ""
+    },
+    {
+      "ClientType": "besu",
+      "RPC": "http://localhost:32792",
+      "WebSocket": "ws://localhost:8546",
+      "ServiceName": "besu-node",
+      "LogsDir": ""
+    },
+    {
+      "ClientType": "reth",
+      "RPC": "http://localhost:32778",
+      "WebSocket": "ws://localhost:8546",
+      "ServiceName": "reth-node",
+      "LogsDir": ""
+    },
+    {
+      "ClientType": "erigon",
+      "RPC": "http://localhost:32787",
+      "WebSocket": "ws://localhost:8556",
+      "ServiceName": "erigon-node",
+      "LogsDir": ""
+    }
+  ],
+  "prefunded_account_keys": [
+    "0x99a645788abc2c869697526ff7c13fa217a1a3827bb308d4d55d219eea949d20",
+    "0x05540ecd850d6ba073e87e046d7aa94569cb66f3c1496d80aea9d61bf42e43d7",
+    "0xd05ad193e488d3e45efe14239564b81c981ef3ed150a3f6777551c563b58d6bc",
+    "0x69c4baa86669706bc8c100b76cbefa2e1b6b98360616604b7971c670b33482a9",
+    "0x7cf86b510a080ced4310d96671b24d1f6d9143d9ad5b38d508676509efc567c0"
+  ]
+}
