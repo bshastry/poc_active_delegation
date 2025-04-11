@@ -1,0 +1,60 @@
+participants_matrix:
+  el:
+    - el_type: geth
+      el_image: ethereum/client-go:v1.15.7
+    - el_type: reth
+      el_image: ghcr.io/paradigmxyz/reth:v1.3.7
+    - el_type: nethermind
+      el_image: nethermind/nethermind:1.31.6
+    - el_type: erigon
+      el_image: erigontech/erigon:v3.0.0
+    - el_type: besu
+      el_image: hyperledger/besu:25.3.0
+  cl:
+    - cl_type: lighthouse
+      cl_image: sigp/lighthouse:v7.0.0-beta.5
+network_params:
+  electra_fork_epoch: 1
+  min_validator_withdrawability_delay: 1
+  shard_committee_period: 1
+  churn_limit_quotient: 16
+  prefunded_accounts: '{
+    "0x3cb253F38624315479bc244c78a0E71C328CE84F": {"balance": "1000000ETH"},
+    "0x0b8348Fe5942a5C02bEeEFF4E74C2DE7BDa60e1f": {"balance": "1000000ETH"},
+    "0x4f98Ce6a71322D6E893C9D728392B2A1C067E9B0": {"balance": "1000000ETH"},
+    "0xC352DDBB1F35ceA192cA8155A627cdbdDcA40e78": {"balance": "1000000ETH"},
+    "0x56e212F19efCE079CE292F07E135B55876aB4618": {"balance": "1000000ETH"}
+  }'
+
+additional_services:
+  - dora
+  - assertoor
+
+snooper_enabled: false
+assertoor_params:
+  run_stability_check: false
+  run_block_proposal_check: false
+  tests:
+    - { file: "https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/wait-for-slot.yaml", id: "wait1", config: { slot: 34 }}
+    - { file: "https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/bls-changes.yaml", config: { validatorCount: 300 }}
+
+    # EIP-6110
+    - { file: "https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/wait-for-slot.yaml", id: "wait2", config: { slot: 38 }}
+    - https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/massive-deposit-0x02.yaml
+
+    # EIP-2935
+    - { file: "https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/wait-for-slot.yaml", id: "wait3", config: { slot: 42 }}
+    - https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/blockhash-test.yaml
+
+    # EIP-7002
+    - { file: "https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/wait-for-slot.yaml", id: "wait4", config: { slot: 46 }}
+    - { file: "https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/voluntary-exits.yaml", config: { validatorCount: 10 }}
+    - { file: "https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/wait-for-slot.yaml", id: "wait5", config: { slot: 50 }}
+    - { file: "https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/el-triggered-exit.yaml", config: { validatorIndex: 20 }}
+
+    # EIP-7251
+    - { file: "https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/wait-for-slot.yaml", id: "wait6", config: { slot: 54 }}
+    - { file: "https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/pectra-dev/el-triggered-consolidation.yaml", config: { sourceValidatorIndex: 21, targetValidatorIndex: 25 }}
+
+    # Final check
+    - { file: "https://raw.githubusercontent.com/ethpandaops/assertoor-test/master/assertoor-tests/block-proposal-check.yaml" }
