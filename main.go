@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -22,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/holiman/uint256"
 )
 
@@ -197,7 +197,7 @@ func generateEIP7702Transaction(client ClientInfo, authority, delegate common.Ad
 	valueU256, _ := uint256.FromBig(valueBig)
 
 	// Select a target address (different from the authority)
-	to := client.Address
+	to := delegate
 
 	// Create an empty access list
 	accessList := types.AccessList{}
@@ -207,6 +207,13 @@ func generateEIP7702Transaction(client ClientInfo, authority, delegate common.Ad
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate authorization: %w", err)
 	}
+
+	nonce, err = client.Client.PendingNonceAt(context.Background(), client.Address)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get nonce: %w", err)
+	}
+
+	log.Printf("Sender (%s) Nonce for Tx: %d", client.Address.Hex(), nonce)
 
 	// Create the SetCodeTx
 	innerTxData := &types.SetCodeTx{
@@ -221,6 +228,8 @@ func generateEIP7702Transaction(client ClientInfo, authority, delegate common.Ad
 		AccessList: accessList,
 		AuthList:   []types.SetCodeAuthorization{*auth},
 	}
+	log.Printf("SetCodeTx Details: ChainID=%s, Nonce=%d, GasTipCap=%s, GasFeeCap=%s, Gas=%d, To=%s, Value=%s, Data=%x, AccessList=%v, AuthList=%+v",
+		innerTxData.ChainID.String(), innerTxData.Nonce, innerTxData.GasTipCap.String(), innerTxData.GasFeeCap.String(), innerTxData.Gas, innerTxData.To.Hex(), innerTxData.Value.String(), innerTxData.Data, innerTxData.AccessList, innerTxData.AuthList)
 
 	// Create and sign the transaction
 	tx := types.NewTx(innerTxData)
@@ -251,21 +260,24 @@ func generateValidAuthorization(client ClientInfo, authority, delegate common.Ad
 		log.Printf("Failed to get pending nonce for signer address %s: %v", signerAddr.Hex(), err)
 		return nil, fmt.Errorf("failed to get nonce for signer %s: %w", signerAddr.Hex(), err)
 	}
+	log.Printf("Using provided AuthNonce: %d for authority %s", signerNonce, signerAddr.Hex())
 
 	// Construct the EIP-7702 Authorization signing hash
 	authChainID := chainIDBig.Uint64()
 	magicByte := []byte{0x05} // EIP-7702 Magic Byte
 
-	chainIdBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(chainIdBytes, authChainID)
-
-	contractAddressBytes := delegate.Bytes()
-
-	nonceBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(nonceBytes, signerNonce)
+	payloadItems := []interface{}{
+		authChainID,
+		delegate,
+		signerNonce,
+	}
+	rlpEncodedPayload, err := rlp.EncodeToBytes(payloadItems)
+	if err != nil {
+		return nil, fmt.Errorf("failed to RLP encode auth payload: %w", err)
+	}
 
 	// Concatenate: MAGIC (1) + chainId (8) + contract_address (20) + signer_nonce (8) = 37 bytes
-	message := bytes.Join([][]byte{magicByte, chainIdBytes, contractAddressBytes, nonceBytes}, nil)
+	message := append(magicByte, rlpEncodedPayload...)
 
 	// Calculate Keccak256 hash
 	signingHash := crypto.Keccak256Hash(message)
@@ -305,8 +317,9 @@ func generateValidAuthorization(client ClientInfo, authority, delegate common.Ad
 		V:       sigV,
 	}
 
-	log.Printf("Generated valid authorization: signer %s, contract %s, nonce %d",
-		signerAddr.Hex(), delegate.Hex(), signerNonce)
+	log.Printf("Generated valid authorization: Authority=%s, Delegate=%s, AuthNonce=%d, ChainID=%s, V=%d, R=%s, S=%s",
+		signerAddr.Hex(), delegate.Hex(), signerNonce, auth.ChainID.String(), auth.V, auth.R.String(), auth.S.String())
+
 	return auth, nil
 }
 
