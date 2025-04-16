@@ -318,7 +318,7 @@ func generateValidAuthorization(client ClientInfo, authority, delegate common.Ad
 	}
 
 	log.Printf("Generated valid authorization: Authority=%s, Delegate=%s, AuthNonce=%d, ChainID=%s, V=%d, R=%s, S=%s",
-		signerAddr.Hex(), delegate.Hex(), signerNonce, auth.ChainID.String(), auth.V, auth.R.String(), auth.S.String())
+		signerAddr.Hex(), auth.Address.Hex(), auth.Nonce, auth.ChainID.String(), auth.V, auth.R.String(), auth.S.String())
 
 	return auth, nil
 }
