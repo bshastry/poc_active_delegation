@@ -6,10 +6,12 @@ import (
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"math/big"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -458,7 +460,7 @@ func connectToClients(config *Config) ([]ClientInfo, error) {
 }
 
 // runDelegationTest runs the delegation test for a client
-func runDelegationTest(client ClientInfo, contractAddress common.Address) (*Result, error) {
+func runDelegationTest(client ClientInfo, authority, contractAddress common.Address) (*Result, error) {
 	log.Printf("Running delegation test for %s...", client.ClientType)
 
 	// Get chain ID
@@ -467,8 +469,6 @@ func runDelegationTest(client ClientInfo, contractAddress common.Address) (*Resu
 		return nil, fmt.Errorf("failed to get chain ID: %w", err)
 	}
 
-	// Select an authority (use the client's address as the authority)
-	authority := client.Address
 	log.Printf("Using authority: %s and delegate: %s", authority.Hex(), contractAddress.Hex())
 
 	// Get the nonce for the sender
@@ -492,7 +492,7 @@ func runDelegationTest(client ClientInfo, contractAddress common.Address) (*Resu
 	// Wait for the transaction to be mined
 	log.Println("Waiting for transaction to be mined...")
 	var receipt *types.Receipt
-	maxAttempts := 30 // Maximum number of attempts
+	maxAttempts := 70 // Maximum number of attempts
 	for i := 0; i < maxAttempts; i++ {
 		receipt, err = client.Client.TransactionReceipt(context.Background(), tx.Hash())
 		if err == nil && receipt != nil {
@@ -536,6 +536,12 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	log.Println("Starting EIP-7702 delegation proof of concept")
 
+	// Define command-line flags
+	selfDelegation := flag.Bool("selfdelegation", false, "Enable self-delegation mode")
+	randomClientOrder := flag.Bool("randomclientorder", false, "Enable random client order")
+	createReadmeFlag := flag.Bool("createReadme", false, "Create README.md with findings")
+	flag.Parse() // Parse the flags
+
 	// Load configuration
 	config, err := loadConfig()
 	if err != nil {
@@ -577,10 +583,38 @@ func main() {
 	}
 	log.Printf("SimpleDelegate contract deployed at: %s", contractAddress.Hex())
 
-	// Run the delegation test for each client
+	// Shuffle the clients slice for random traversal order
+	if *randomClientOrder {
+		log.Println("Shuffling client order for delegation tests...")
+		rand.Shuffle(len(clients), func(i, j int) {
+			clients[i], clients[j] = clients[j], clients[i]
+		})
+		log.Println("Shuffled client order for delegation tests.")
+	}
+
+	// Run the delegation test for each client in the shuffled order
 	var results []*Result
-	for _, client := range clients {
-		result, err := runDelegationTest(client, contractAddress)
+	for idx, client := range clients {
+		var authorityAddress common.Address
+		var err error
+		var result *Result
+
+		if *selfDelegation {
+			// Self-delegation mode: Use the client's own address as authority
+			authorityAddress = client.Address
+			log.Printf("Running self-delegation test for %s (Authority: %s)", client.ClientType, authorityAddress.Hex())
+			result, err = runDelegationTest(client, authorityAddress, contractAddress)
+		} else {
+			// Non-self-delegation mode: Use the next client's address as authority (wrapping around)
+			nextIdx := idx + 1
+			if nextIdx == len(clients) {
+				nextIdx = 0
+			}
+			authorityAddress = clients[nextIdx].Address
+			log.Printf("Running non-self-delegation test for %s (Authority: %s)", client.ClientType, authorityAddress.Hex())
+			result, err = runDelegationTest(client, authorityAddress, contractAddress)
+		}
+
 		if err != nil {
 			log.Printf("Failed to run delegation test for %s: %v", client.ClientType, err)
 			continue
@@ -595,6 +629,14 @@ func main() {
 		log.Printf("  Code Size: %d bytes", result.CodeSize)
 		log.Printf("  Code Hex: %s", result.CodeHex)
 		log.Printf("  Delegation Works: %v", result.DelegationWorks)
+	}
+
+	if *createReadmeFlag {
+		// Create README.md with findings
+		createReadme(results, contractAddress)
+		log.Println("README.md created successfully")
+	} else {
+		log.Println("Skipping README.md creation")
 	}
 }
 
